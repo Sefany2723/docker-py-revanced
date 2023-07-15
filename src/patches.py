@@ -43,34 +43,39 @@ class Patches(object):
         "com.sony.songpal.mdr": "sonyheadphone",
         "com.dci.dev.androidtwelvewidgets": "androidtwelvewidgets",
         "io.yuka.android": "yuka",
+        "free.reddit.news": "relay",
+        "com.rubenmayayo.reddit": "boost",
+        "com.andrewshu.android.reddit": "rif",
+        "com.laurencedawson.reddit_sync": "sync",
+        "ml.docilealligator.infinityforreddit": "infinity",
+        "me.ccrama.redditslide": "slide",
+        "com.onelouder.baconreader": "bacon",
     }
     revanced_app_ids = {
         key: (value, "_" + value) for key, value in _revanced_app_ids.items()
     }
     _revanced_extended_app_ids = {
-        "com.google.android.youtube": ("youtube", "_yt"),
-        "com.google.android.apps.youtube.music": ("youtube_music", "_ytm"),
+        "com.google.android.youtube": "youtube",
+        "com.google.android.apps.youtube.music": "youtube_music",
+        "com.mgoogle.android.gms": "microg",
+        "com.reddit.frontpage": "reddit",
     }
     revanced_extended_app_ids = {
-        key: (value[0], "_" + value[0])
-        for key, value in _revanced_extended_app_ids.items()
+        key: (value, "_" + value) for key, value in _revanced_extended_app_ids.items()
     }
 
     @staticmethod
     def check_java() -> None:
         """Check if Java17 is installed."""
         try:
-            logger.debug("Checking if java is available")
             jd = subprocess.check_output(
                 ["java", "-version"], stderr=subprocess.STDOUT
             ).decode("utf-8")
             jd = jd[1:-1]
             if "Runtime Environment" not in jd:
-                logger.debug("Java Must be installed")
-                exit(-1)
+                raise subprocess.CalledProcessError(-1, "java -version")
             if "17" not in jd:
-                logger.debug("Java 17 Must be installed")
-                exit(-1)
+                raise subprocess.CalledProcessError(-1, "java -version")
             logger.debug("Cool!! Java is available")
         except subprocess.CalledProcessError:
             logger.debug("Java 17 Must be installed")
@@ -85,17 +90,22 @@ class Patches(object):
             with open("patches.json") as f:
                 patches = json.load(f)
         else:
-            logger.debug("fetching all patches")
-            response = session.get(
-                "https://raw.githubusercontent.com/revanced/revanced-patches/main/patches.json"
-            )
+            url = "https://raw.githubusercontent.com/revanced/revanced-patches/main/patches.json"
+            logger.debug(f"fetching all patches from {url}")
+            response = session.get(url)
             handle_response(response)
             patches = response.json()
 
         for app_name in (self.revanced_app_ids[x][1] for x in self.revanced_app_ids):
             setattr(self, app_name, [])
+        setattr(self, "universal_patch", [])
 
         for patch in patches:
+            if not patch["compatiblePackages"]:
+                p = {x: patch[x] for x in ["name", "description"]}
+                p["app"] = "universal"
+                p["version"] = "all"
+                getattr(self, "universal_patch").append(p)
             for compatible_package, version in [
                 (x["name"], x["versions"]) for x in patch["compatiblePackages"]
             ]:
@@ -137,11 +147,15 @@ class Patches(object):
         for app_name, app_id in self.revanced_app_ids.values():
             n_patches = len(getattr(self, app_id))
             logger.debug(f"Total patches in {app_name} are {n_patches}")
+        n_patches = len(getattr(self, "universal_patch"))
+        logger.debug(f"Total universal patches are {n_patches}")
 
     def __init__(self, config: RevancedConfig) -> None:
         self.config = config
         self.check_java()
         self.fetch_patches()
+        if self.config.dry_run:
+            self.config.apps = list(self._revanced_app_ids.values())
 
     def get(self, app: str) -> Tuple[List[Dict[str, str]], str]:
         """Get all patches for the given app.
@@ -176,17 +190,27 @@ class Patches(object):
         :param parser: Parser Obj
         :param patches: All the patches of a given app
         """
-        logger.debug(f"Excluding patches for app {app}")
         if self.config.build_extended and app in self.config.extended_apps:
             excluded_patches = self.config.env.list(
                 f"EXCLUDE_PATCH_{app}_EXTENDED".upper(), []
             )
+            included_patches = self.config.env.list(
+                f"INCLUDE_PATCH_{app}_EXTENDED".upper(), []
+            )
         else:
             excluded_patches = self.config.env.list(f"EXCLUDE_PATCH_{app}".upper(), [])
+            included_patches = self.config.env.list(f"INCLUDE_PATCH_{app}".upper(), [])
         for patch in patches:
-            parser.include(patch["name"]) if patch[
-                "name"
-            ] not in excluded_patches else parser.exclude(patch["name"])
+            normalized_patch = patch["name"].lower().replace(" ", "-")
+            parser.include(
+                normalized_patch
+            ) if normalized_patch not in excluded_patches else parser.exclude(
+                normalized_patch
+            )
+        for normalized_patch in included_patches:
+            parser.include(normalized_patch) if normalized_patch not in getattr(
+                self, "universal_patch", []
+            ) else ()
         excluded = parser.get_excluded_patches()
         if excluded:
             logger.debug(f"Excluded patches {excluded} for {app}")

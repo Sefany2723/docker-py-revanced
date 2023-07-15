@@ -1,4 +1,5 @@
 """Utilities."""
+import re
 from typing import Dict
 
 from loguru import logger
@@ -43,9 +44,35 @@ class AppNotFound(ValueError):
     pass
 
 
+class PatcherDownloadFailed(Exception):
+    """Not a valid Revanced App."""
+
+    pass
+
+
 def handle_response(response: Response) -> None:
     """Handle Get Request Response."""
     response_code = response.status_code
     if response_code != 200:
         logger.error(response.text)
         exit(1)
+
+
+def slugify(string: str) -> str:
+    """Converts a string to a slug format."""
+    # Convert to lowercase
+    string = string.lower()
+
+    # Remove special characters
+    string = re.sub(r"[^\w\s-]", "", string)
+
+    # Replace spaces with dashes
+    string = re.sub(r"\s+", "-", string)
+
+    # Remove consecutive dashes
+    string = re.sub(r"-+", "-", string)
+
+    # Remove leading and trailing dashes
+    string = string.strip("-")
+
+    return string
