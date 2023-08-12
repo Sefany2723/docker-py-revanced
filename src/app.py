@@ -8,7 +8,8 @@ from typing import Dict
 from loguru import logger
 
 from src.config import RevancedConfig
-from src.utils import PatcherDownloadFailed, slugify
+from src.exceptions import PatchingFailed
+from src.utils import slugify
 
 
 class APP(object):
@@ -54,7 +55,9 @@ class APP(object):
         return ", ".join([f"{key}: {value}" for key, value in attrs.items()])
 
     @staticmethod
-    def download(url: str, config: RevancedConfig, assets_filter: str) -> str:
+    def download(
+        url: str, config: RevancedConfig, assets_filter: str, file_name: str = ""
+    ) -> str:
         """Downloader."""
         from src.downloader.download import Downloader
 
@@ -62,9 +65,12 @@ class APP(object):
         if url.startswith("https://github"):
             from src.downloader.github import Github
 
-            url = Github.patch_resource(url, assets_filter)[0]
-        extension = pathlib.Path(url).suffix
-        file_name = APP.generate_filename(url) + extension
+            url = Github.patch_resource(url, assets_filter, config)
+        elif url.startswith("local://"):
+            return url.split("/")[-1]
+        if not file_name:
+            extension = pathlib.Path(url).suffix
+            file_name = APP.generate_filename(url) + extension
         Downloader(None, config).direct_download(url, file_name)  # type: ignore
         return file_name
 
@@ -94,7 +100,7 @@ class APP(object):
                 try:
                     self.resource[resource_name] = future.result()
                 except Exception as e:
-                    raise PatcherDownloadFailed(f"An exception occurred: {e}")
+                    raise PatchingFailed(e) from e
 
     @staticmethod
     def generate_filename(url: str) -> str:

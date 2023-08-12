@@ -10,8 +10,9 @@ from tqdm import tqdm
 
 from src.config import RevancedConfig
 from src.downloader.utils import implement_method
+from src.exceptions import PatchingFailed
 from src.patches import Patches
-from src.utils import handle_response
+from src.utils import handle_github_response
 
 
 class Downloader(object):
@@ -35,6 +36,8 @@ class Downloader(object):
         return False
 
     def _download(self, url: str, file_name: str) -> None:
+        if not url:
+            raise PatchingFailed("No download to download")
         if self.file_status_check(
             self.config.temp_folder.joinpath(file_name), self.config.dry_run, url
         ):
@@ -51,7 +54,7 @@ class Downloader(object):
             stream=True,
             headers=headers,
         )
-        handle_response(response)
+        handle_github_response(response)
         total = int(response.headers.get("content-length", 0))
         bar = tqdm(
             desc=file_name,

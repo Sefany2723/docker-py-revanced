@@ -1,5 +1,4 @@
 """Revanced Parser."""
-import sys
 from subprocess import PIPE, Popen
 from time import perf_counter
 from typing import List
@@ -8,12 +7,21 @@ from loguru import logger
 
 from src.app import APP
 from src.config import RevancedConfig
+from src.exceptions import PatchingFailed
 from src.patches import Patches
 from src.utils import possible_archs
 
 
 class Parser(object):
     """Revanced Parser."""
+
+    CLI_JAR = "-jar"
+    APK_ARG = "-a"
+    PATCHES_ARG = "-b"
+    INTEGRATIONS_ARG = "-m"
+    OUTPUT_ARG = "-o"
+    KEYSTORE_ARG = "--keystore"
+    OPTIONS_ARG = "--options"
 
     def __init__(self, patcher: Patches, config: RevancedConfig) -> None:
         self._PATCHES: List[str] = []
@@ -78,19 +86,19 @@ class Parser(object):
         :param app: Name of the app
         """
         args = [
-            "-jar",
+            self.CLI_JAR,
             app.resource["cli"],
-            "-a",
+            self.APK_ARG,
             f"{app.app_name}.apk",
-            "-b",
+            self.PATCHES_ARG,
             app.resource["patches"],
-            "-m",
+            self.INTEGRATIONS_ARG,
             app.resource["integrations"],
-            "-o",
+            self.OUTPUT_ARG,
             app.get_output_file_name(),
-            "--keystore",
+            self.KEYSTORE_ARG,
             app.keystore_name,
-            "--options",
+            self.OPTIONS_ARG,
             "options.json",
         ]
         if app.experiment:
@@ -112,8 +120,7 @@ class Parser(object):
         process = Popen(["java", *args], stdout=PIPE)
         output = process.stdout
         if not output:
-            logger.error("Failed to send request for patching.")
-            sys.exit(-1)
+            raise PatchingFailed("Failed to send request for patching.")
         for line in output:
             logger.debug(line.decode(), flush=True, end="")
         process.wait()
