@@ -1,4 +1,6 @@
 """Revanced Patches."""
+
+import contextlib
 import json
 from typing import Any, Dict, List, Tuple
 
@@ -59,6 +61,14 @@ class Patches(object):
     }
 
     @staticmethod
+    def get_package_name(app: str) -> str:
+        """Get Package name from app name."""
+        for package, app_tuple in Patches.revanced_app_ids.items():
+            if app_tuple[0] == app:
+                return package
+        raise AppNotFound("App Not Found.")
+
+    @staticmethod
     def support_app() -> Dict[str, str]:
         """Return supported apps."""
         return Patches._revanced_app_ids
@@ -106,10 +116,8 @@ class Patches(object):
             raise AppNotFound(app)
         patches = getattr(self, app_name)
         version = "latest"
-        try:
+        with contextlib.suppress(StopIteration):
             version = next(i["version"] for i in patches if i["version"] != "all")
-        except StopIteration:
-            pass
         return patches, version
 
     def include_exclude_patch(
@@ -166,5 +174,5 @@ class PatchLoader:
             with open(file_name) as f:
                 patches = json.load(f)
             return patches
-        except FileNotFoundError:
-            raise PatchesJsonFailed()
+        except FileNotFoundError as e:
+            raise PatchesJsonFailed() from e

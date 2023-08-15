@@ -1,5 +1,4 @@
 """Status check."""
-import json
 import re
 from typing import List
 
@@ -10,7 +9,12 @@ from google_play_scraper.exceptions import GooglePlayScraperException
 
 from src.exceptions import APKMirrorScrapperFailure
 from src.patches import Patches
-from src.utils import handle_github_response
+from src.utils import (
+    apk_mirror_base_url,
+    apkmirror_status_check,
+    bs4_parser,
+    handle_github_response,
+)
 
 not_found_icon = "https://img.icons8.com/bubbles/500/android-os.png"
 headers = {
@@ -25,7 +29,7 @@ def apkcombo_scrapper(package_name: str) -> str:
     try:
         apkcombo_url = f"https://apkcombo.com/genericApp/{package_name}"
         r = requests.get(apkcombo_url, headers=headers, allow_redirects=True)
-        soup = BeautifulSoup(r.text, "html.parser")
+        soup = BeautifulSoup(r.text, bs4_parser)
         url = soup.select_one("div.avatar > img")["data-src"]
         return re.sub(r"=.*$", "", url)
     except Exception:
@@ -34,23 +38,11 @@ def apkcombo_scrapper(package_name: str) -> str:
 
 def apkmirror_scrapper(package_name: str) -> str:
     """Apkmirror URL."""
-    apk_mirror_base_url = "https://www.apkmirror.com"
-    check_if_exist = f"{apk_mirror_base_url}/wp-json/apkm/v1/app_exists/"
-    body = {"pnames": [package_name]}
-    check_header = {
-        "User-Agent": "APKUpdater-v" + "3.0.1",
-        "Authorization": "Basic YXBpLWFwa3VwZGF0ZXI6cm01cmNmcnVVakt5MDRzTXB5TVBKWFc4",
-        "Content-Type": "application/json",
-    }
-    response = json.loads(
-        requests.post(
-            check_if_exist, data=json.dumps(body), headers=check_header
-        ).content
-    )
+    response = apkmirror_status_check(package_name)
     if response["data"][0]["exists"]:
         search_url = f"{apk_mirror_base_url}/?s={package_name}"
         r = requests.get(search_url, headers=headers)
-        soup = BeautifulSoup(r.text, "html.parser")
+        soup = BeautifulSoup(r.text, bs4_parser)
         sub_url = soup.select_one("div.bubble-wrap > img")["src"]
         new_width = 500
         new_height = 500
