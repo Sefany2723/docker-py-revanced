@@ -34,7 +34,10 @@ def main() -> None:
             downloader = DownloaderFactory.create_downloader(
                 app=app.app_name, patcher=patcher, config=config
             )
-            downloader.download(app.app_version, app.app_name)
+            app.download_file_name, app.download_dl = downloader.download(
+                app.app_version, app.app_name
+            )
+            logger.info(app)
             parser.patch_app(app)
         except AppNotFound as e:
             logger.info(f"Invalid app requested to build {e}")
