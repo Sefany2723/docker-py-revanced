@@ -3,7 +3,8 @@ from pathlib import Path
 from typing import List, Self
 
 from environs import Env
-from requests import Session
+
+from src.utils import default_build
 
 default_cli = "https://github.com/revanced/revanced-cli/releases/latest"
 default_patches = "https://github.com/revanced/revanced-patches/releases/latest"
@@ -15,17 +16,10 @@ class RevancedConfig(object):
     """Revanced Configurations."""
 
     def __init__(self: Self, env: Env) -> None:
-        from src.utils import default_build, request_header
-
         self.env = env
-        self.temp_folder = Path("apks")
-        self.session = Session()
-        self.session.headers["User-Agent"] = request_header["User-Agent"]
+        self.temp_folder_name = "apks"
+        self.temp_folder = Path(self.temp_folder_name)
         self.ci_test = env.bool("CI_TEST", False)
-        self.apps = env.list(
-            "PATCH_APPS",
-            default_build,
-        )
         self.rip_libs_apps: List[str] = []
         self.existing_downloaded_apks = env.list("EXISTING_DOWNLOADED_APKS", [])
         self.personal_access_token = env.str("PERSONAL_ACCESS_TOKEN", None)
@@ -39,3 +33,4 @@ class RevancedConfig(object):
         self.extra_download_files: List[str] = env.list("EXTRA_FILES", [])
         self.apk_editor = "apkeditor-output.jar"
         self.extra_download_files.append("https://github.com/REAndroid/APKEditor@apkeditor.jar")
+        self.apps = env.list("PATCH_APPS", default_build)

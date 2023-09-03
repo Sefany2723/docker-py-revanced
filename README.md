@@ -202,8 +202,9 @@ You can use any of the following methods to build.
     - [scbeasy](https://www.apkmonk.com/app/com.scb.phone/)
     - [reddit-news](https://m.apkpure.com/relay-for-reddit/reddit.news)
     - [finanz-online](https://apksos.com/app/at.gv.bmf.bmf2go)
+
     <br>`**` - You can also patch any other app which is **not** supported officially.To do so, you need to provide
-   few more inputs to the tool which are mentioned below.
+   few more inputs to the tool which are mentioned below. These config will override the sources config from the tool.
    ```ini
    <APP_NAME>_DL_SOURCE=<apk-link-to-any-of-the-suppored-scrapper>
    <APP_NAME>_PACKAGE_NAME=<package-name-of-the-application>
@@ -225,6 +226,9 @@ You can use any of the following methods to build.
    5. APKMonk - Supports downloading any available version
        1. Link Format - https://www.apkmonk.com/app/<package-name>/
        2. Example Link - https://www.apkmonk.com/app/<package-name>/
+   6. Google Drive - Supports downloading from Google Drive lint
+       1. Link Format - https://drive.google.com/uc?<id>
+       2. Example Link - https://drive.google.com/uc?id=1ad44UTghbDty8o36Nrp3ZMyUzkPckIqY
 
    <br>Please verify the source of original APKs yourself with links provided. I'm not responsible for any damage
     caused.If you know any better/safe source to download clean. Open a discussion.
@@ -386,7 +390,3 @@ You can use any of the following methods to build.
     once. Add it in `GitHub secrets`.<br>
 17. Sample Envs<br>
     <img src="https://i.imgur.com/FxOtiGs.png" width="600" style="left">
-18. Make sure your Action has write access. If not click
-    [here](https://github.com/nikhilbadyal/docker-py-revanced/settings/actions).
-    In the bottom give read and write access to Actions.
-    <img src="https://i.imgur.com/STSv2D3.png" width="400">
