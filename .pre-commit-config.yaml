@@ -23,7 +23,7 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 'v0.3.3'
+    rev: 'v0.3.4'
     hooks:
       - id: ruff
         args:
@@ -67,7 +67,7 @@ repos:
         args:
           - '--strict'
           - "--config=pyproject.toml"
-        additional_dependencies: [ types-requests,types-beautifulsoup4 ]
+        additional_dependencies: [ types-requests,types-beautifulsoup4,types-pytz ]
 
 ci:
     autofix_commit_msg: |
