@@ -18,7 +18,7 @@ on:
       COMMIT_CHANGELOG:
         type: boolean
         required: false
-        default: false
+        default: true
       DEBUG_ENABLED:
         type: boolean
         description: 'Run the build with tmate debugging enabled.'
@@ -104,6 +104,6 @@ jobs:
         with:
           branch: changelogs
           skip_checkout: true
-          file_pattern: changelog.md
+          file_pattern: 'changelog.md updates.json'
           commit_message: 🚀New Build
           push_options: '--force'
