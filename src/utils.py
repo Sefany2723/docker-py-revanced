@@ -1,16 +1,23 @@
 """Utilities."""
 
+import inspect
 import json
 import re
 import subprocess
 import sys
+import time
+from datetime import datetime
 from json import JSONDecodeError
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import requests
 from loguru import logger
+from pytz import timezone
 from requests import Response, Session
+
+if TYPE_CHECKING:
+    from src.app import APP
 
 from src.downloader.sources import APK_MIRROR_APK_CHECK
 from src.downloader.utils import status_code_200
@@ -30,11 +37,13 @@ request_header = {
 }
 bs4_parser = "html.parser"
 changelog_file = "changelog.md"
+changelog_json_file = "changelog.json"
 request_timeout = 60
 session = Session()
 session.headers["User-Agent"] = request_header["User-Agent"]
 updates_file = "updates.json"
 changelogs: dict[str, dict[str, str]] = {}
+time_zone = "Asia/Kolkata"
 
 
 def update_changelog(name: str, response: dict[str, str]) -> None:
@@ -80,10 +89,12 @@ def format_changelog(name: str, response: dict[str, str]) -> dict[str, str]:
 
 def write_changelog_to_file() -> None:
     """The function `write_changelog_to_file` writes a given changelog json to a file."""
-    markdown_table = """
-    | Resource Name | Version | Changelog | Published On | Build By|\n
-    |---------------|---------|-----------|--------------|---------|\n
-    """
+    markdown_table = inspect.cleandoc(
+        """
+    | Resource Name | Version | Changelog | Published On | Build By|
+    |---------------|---------|-----------|--------------|---------|
+    """,
+    )
     for app_data in changelogs.values():
         name_link = app_data["ResourceName"]
         version = app_data["Version"]
@@ -94,11 +105,13 @@ def write_changelog_to_file() -> None:
         # Clean up changelog for markdown
         changelog = changelog.replace("\r\n", "<br>")
         changelog = changelog.replace("\n", "<br>")
+        changelog = changelog.replace("|", "\\|")
 
         # Add row to the Markdown table string
-        markdown_table += f"| {name_link} | {version} | {changelog} | {published_at} | {built_by} |\n"
+        markdown_table += f"\n| {name_link} | {version} | {changelog} | {published_at} | {built_by} |"
     with Path(changelog_file).open("w", encoding="utf_8") as file1:
         file1.write(markdown_table)
+    Path(changelog_json_file).write_text(json.dumps(changelogs, indent=4) + "\n")
 
 
 def get_parent_repo() -> str:
@@ -211,7 +224,13 @@ def contains_any_word(string: str, words: list[str]) -> bool:
     return any(word in string for word in words)
 
 
-def save_patch_info(app: Any) -> None:
+def datetime_to_ms_epoch(dt: datetime) -> int:
+    """Returns millis since epoch."""
+    microseconds = time.mktime(dt.timetuple()) * 1000000 + dt.microsecond
+    return int(round(microseconds / float(1000)))
+
+
+def save_patch_info(app: "APP") -> None:
     """Save version info a patching resources used to a file."""
     try:
         with Path(updates_file).open() as file:
@@ -221,10 +240,13 @@ def save_patch_info(app: Any) -> None:
         old_version = {}  # or any default value you want to assign
 
     old_version[app.app_name] = {
-        "version": app.app_version,
+        "app_version": app.app_version,
         "integrations_version": app.resource["integrations"]["version"],
         "patches_version": app.resource["patches"]["version"],
         "cli_version": app.resource["cli"]["version"],
         "patches_json_version": app.resource["patches_json"]["version"],
+        "ms_epoch_since_patched": datetime_to_ms_epoch(datetime.now(timezone(time_zone))),
+        "date_patched": datetime.now(timezone(time_zone)),
+        "app_dump": app.for_dump(),
     }
-    Path(updates_file).write_text(json.dumps(old_version, indent=4) + "\n")
+    Path(updates_file).write_text(json.dumps(old_version, indent=4, default=str) + "\n")

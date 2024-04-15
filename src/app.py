@@ -5,7 +5,7 @@ import hashlib
 import pathlib
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import Self
+from typing import Any, Self
 
 from loguru import logger
 from pytz import timezone
@@ -13,7 +13,7 @@ from pytz import timezone
 from src.config import RevancedConfig
 from src.downloader.sources import apk_sources
 from src.exceptions import BuilderError, DownloadError, PatchingFailedError
-from src.utils import slugify
+from src.utils import slugify, time_zone
 
 
 class APP(object):
@@ -43,7 +43,6 @@ class APP(object):
         self.options_file = config.env.str(f"{app_name}_OPTIONS_FILE".upper(), config.global_options_file)
         self.download_file_name = ""
         self.download_dl = config.env.str(f"{app_name}_DL".upper(), "")
-        self.download_patch_resources(config)
         self.download_source = config.env.str(f"{app_name}_DL_SOURCE".upper(), "")
         self.package_name = package_name
         self.old_key = config.env.bool(f"{app_name}_OLD_KEY".upper(), config.global_old_key)
@@ -81,7 +80,7 @@ class APP(object):
         -------
             a string that represents the output file name for an APK file.
         """
-        current_date = datetime.now(timezone("Asia/Kolkata"))
+        current_date = datetime.now(timezone(time_zone))
         formatted_date = current_date.strftime("%Y%b%d_%I%M%p").upper()
         return f"Re-{self.app_name}-{slugify(self.app_version)}-{formatted_date}-output.apk"
 
@@ -89,6 +88,10 @@ class APP(object):
         """Returns the str representation of the app."""
         attrs = vars(self)
         return ", ".join([f"{key}: {value}" for key, value in attrs.items()])
+
+    def for_dump(self: Self) -> dict[str, Any]:
+        """Convert the instance of this class to json."""
+        return self.__dict__
 
     @staticmethod
     def download(url: str, config: RevancedConfig, assets_filter: str, file_name: str = "") -> tuple[str, str]:
@@ -113,7 +116,7 @@ class APP(object):
 
         Returns
         -------
-            a string, which is the file name of the downloaded file.
+            tuple of strings, which is the tag,file name of the downloaded file.
         """
         from src.downloader.download import Downloader
 
