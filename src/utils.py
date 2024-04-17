@@ -20,7 +20,6 @@ if TYPE_CHECKING:
     from src.app import APP
 
 from src.downloader.sources import APK_MIRROR_APK_CHECK
-from src.downloader.utils import status_code_200
 from src.exceptions import ScrapingError
 
 default_build = [
@@ -35,6 +34,10 @@ request_header = {
     "Authorization": "Basic YXBpLWFwa3VwZGF0ZXI6cm01cmNmcnVVakt5MDRzTXB5TVBKWFc4",
     "Content-Type": "application/json",
 }
+default_cli = "https://github.com/revanced/revanced-cli/releases/latest"
+default_patches = "https://github.com/revanced/revanced-patches/releases/latest"
+default_patches_json = default_patches
+default_integrations = "https://github.com/revanced/revanced-integrations/releases/latest"
 bs4_parser = "html.parser"
 changelog_file = "changelog.md"
 changelog_json_file = "changelog.json"
@@ -44,6 +47,15 @@ session.headers["User-Agent"] = request_header["User-Agent"]
 updates_file = "updates.json"
 changelogs: dict[str, dict[str, str]] = {}
 time_zone = "Asia/Kolkata"
+app_version_key = "app_version"
+integration_version_key = "integrations_version"
+patches_version_key = "patches_version"
+cli_version_key = "cli_version"
+patches_json_version_key = "patches_json_version"
+implement_method = "Please implement the method"
+status_code_200 = 200
+resource_folder = "apks"
+branch_name = "changelogs"
 
 
 def update_changelog(name: str, response: dict[str, str]) -> None:
@@ -240,11 +252,11 @@ def save_patch_info(app: "APP") -> None:
         old_version = {}  # or any default value you want to assign
 
     old_version[app.app_name] = {
-        "app_version": app.app_version,
-        "integrations_version": app.resource["integrations"]["version"],
-        "patches_version": app.resource["patches"]["version"],
-        "cli_version": app.resource["cli"]["version"],
-        "patches_json_version": app.resource["patches_json"]["version"],
+        app_version_key: app.app_version,
+        integration_version_key: app.resource["integrations"]["version"],
+        patches_version_key: app.resource["patches"]["version"],
+        cli_version_key: app.resource["cli"]["version"],
+        patches_json_version_key: app.resource["patches_json"]["version"],
         "ms_epoch_since_patched": datetime_to_ms_epoch(datetime.now(timezone(time_zone))),
         "date_patched": datetime.now(timezone(time_zone)),
         "app_dump": app.for_dump(),
