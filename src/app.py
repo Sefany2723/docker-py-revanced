@@ -32,8 +32,6 @@ class APP(object):
         self.experiment = False
         self.cli_dl = config.env.str(f"{app_name}_CLI_DL".upper(), config.global_cli_dl)
         self.patches_dl = config.env.str(f"{app_name}_PATCHES_DL".upper(), config.global_patches_dl)
-        self.integrations_dl = config.env.str(f"{app_name}_INTEGRATIONS_DL".upper(), config.global_integrations_dl)
-        self.patches_json_dl = config.env.str(f"{app_name}_PATCHES_JSON_DL".upper(), self.patches_dl)
         self.exclude_request: list[str] = config.env.list(f"{app_name}_EXCLUDE_PATCH".upper(), [])
         self.include_request: list[str] = config.env.list(f"{app_name}_INCLUDE_PATCH".upper(), [])
         self.resource: dict[str, dict[str, str]] = {}
@@ -46,6 +44,7 @@ class APP(object):
         self.download_source = config.env.str(f"{app_name}_DL_SOURCE".upper(), "")
         self.package_name = package_name
         self.old_key = config.env.bool(f"{app_name}_OLD_KEY".upper(), config.global_old_key)
+        self.patches: list[dict[Any, Any]] = []
         self.space_formatted = config.env.bool(
             f"{app_name}_SPACE_FORMATTED_PATCHES".upper(),
             config.global_space_formatted,
@@ -81,8 +80,8 @@ class APP(object):
             a string that represents the output file name for an APK file.
         """
         current_date = datetime.now(timezone(time_zone))
-        formatted_date = current_date.strftime("%Y%b%d_%I%M%p").upper()
-        return f"Re-{self.app_name}-{slugify(self.app_version)}-{formatted_date}-output.apk"
+        formatted_date = current_date.strftime("%Y%b%d.%I%M%p").upper()
+        return f"Re{self.app_name}-Version{slugify(self.app_version)}-PatchVersion{slugify(self.resource["patches"]["version"])}-{formatted_date}-output.apk"  # noqa: E501
 
     def __str__(self: "APP") -> str:
         """Returns the str representation of the app."""
@@ -149,13 +148,11 @@ class APP(object):
         # Create a list of resource download tasks
         download_tasks = [
             ("cli", self.cli_dl, config, ".*jar"),
-            ("integrations", self.integrations_dl, config, ".*apk"),
-            ("patches", self.patches_dl, config, ".*jar"),
-            ("patches_json", self.patches_json_dl, config, ".*json"),
+            ("patches", self.patches_dl, config, ".*rvp"),
         ]
 
         # Using a ThreadPoolExecutor for parallelism
-        with ThreadPoolExecutor(4) as executor:
+        with ThreadPoolExecutor(1) as executor:
             futures = {resource_name: executor.submit(self.download, *args) for resource_name, *args in download_tasks}
 
             # Wait for all tasks to complete
