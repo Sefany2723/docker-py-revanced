@@ -67,8 +67,8 @@ class Downloader(object):
         """Extract download link from web page."""
         raise NotImplementedError(implement_method)
 
-    def specific_version(self: Self, app: APP, version: str) -> tuple[str, str]:
-        """Function to download the specified version of app from  apkmirror.
+    def specific_version(self: Self, app: "APP", version: str) -> tuple[str, str]:
+        """Function to download the specified version of app..
 
         :param app: Name of the application
         :param version: Version of the application to download

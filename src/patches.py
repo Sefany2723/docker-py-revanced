@@ -1,7 +1,7 @@
 """Revanced Patches."""
 
 import contextlib
-from typing import ClassVar, Self
+from typing import Any, ClassVar, Self
 
 from loguru import logger
 
@@ -81,6 +81,16 @@ class Patches(object):
         "com.soundcloud.android": "soundcloud",
         "de.stocard.stocard": "stocard",
         "at.willhaben": "willhaben",
+        "ch.protonmail.android": "proton-mail",
+        "com.amazon.avod.thirdpartyclient": "prime-video",
+        "com.cricbuzz.android": "cricbuzz",
+        "com.crunchyroll.crunchyroid": "crunchyroll",
+        "com.instagram.barcelona": "threads",
+        "com.nousguide.android.orftvthek": "orf-on",
+        "com.pandora.android": "pandora",
+        "it.ipzs.cieid": "cieid",
+        "ml.docilealligator.infinityforreddit.patreon": "infinity-for-reddit-patreon",
+        "ml.docilealligator.infinityforreddit.plus": "infinity-for-reddit-plus",
     }
 
     @staticmethod
@@ -124,26 +134,122 @@ class Patches(object):
             The `app` parameter is of type `APP`. It represents an instance of the `APP` class.
         """
         self.patches_dict[app.app_name] = []
-        patches = convert_command_output_to_json(
-            f"{config.temp_folder}/{app.resource["cli"]["file_name"]}",
-            f"{config.temp_folder}/{app.resource["patches"]["file_name"]}",
-        )
 
-        for patch in patches:
-            if not patch["compatiblePackages"]:
-                p = {x: patch[x] for x in ["name", "description"]}
-                p["app"] = "universal"
-                p["version"] = "all"
-                self.patches_dict["universal_patch"].append(p)
-            else:
-                for compatible_package, version in [(x["name"], x["versions"]) for x in patch["compatiblePackages"]]:
-                    if app.package_name == compatible_package:
-                        p = {x: patch[x] for x in ["name", "description"]}
-                        p["app"] = compatible_package
-                        p["version"] = version[-1] if version else "all"
-                        self.patches_dict[app.app_name].append(p)
+        # Handle multiple patch bundles
+        if hasattr(app, "patch_bundles") and app.patch_bundles:
+            for bundle in app.patch_bundles:
+                patches = convert_command_output_to_json(
+                    f"{config.temp_folder}/{app.resource["cli"]["file_name"]}",
+                    f"{config.temp_folder}/{bundle["file_name"]}",
+                )
+                self._process_patches(patches, app)
+        elif "patches" in app.resource:
+            # Fallback to single bundle for backward compatibility
+            patches = convert_command_output_to_json(
+                f"{config.temp_folder}/{app.resource["cli"]["file_name"]}",
+                f"{config.temp_folder}/{app.resource["patches"]["file_name"]}",
+            )
+            self._process_patches(patches, app)
 
         app.no_of_patches = len(self.patches_dict[app.app_name])
+
+    def _create_patch_dict(
+        self: Self,
+        patch: dict[Any, Any],
+        app_name: str,
+        version: str | list[str] | None,
+    ) -> dict[str, str]:
+        """Create a patch dictionary with the required fields.
+
+        Parameters
+        ----------
+        patch : dict[Any, Any]
+            The patch data
+        app_name : str
+            The app name or package name
+        version : str | list[str] | None
+            The version information
+
+        Returns
+        -------
+        dict[str, str]
+            Formatted patch dictionary
+        """
+        patch_dict = {x: patch[x] for x in ["name", "description"]}
+        patch_dict["app"] = app_name
+
+        if isinstance(version, list) and version:
+            patch_dict["version"] = version[-1]
+        elif version:
+            patch_dict["version"] = version
+        else:
+            patch_dict["version"] = "all"
+
+        return patch_dict
+
+    def _is_duplicate_patch(self: Self, patch_name: str, app_name: str) -> bool:
+        """Check if patch already exists to avoid duplicates.
+
+        Parameters
+        ----------
+        patch_name : str
+            The name of the patch to check
+        app_name : str
+            The app name to check in
+
+        Returns
+        -------
+        bool
+            True if patch already exists
+        """
+        return any(existing["name"] == patch_name for existing in self.patches_dict[app_name])
+
+    def _process_universal_patch(self: Self, patch: dict[Any, Any]) -> None:
+        """Process a universal patch (no compatible packages).
+
+        Parameters
+        ----------
+        patch : dict[Any, Any]
+            The patch data
+        """
+        patch_dict = self._create_patch_dict(patch, "universal", "all")
+        self.patches_dict["universal_patch"].append(patch_dict)
+
+    def _process_app_specific_patch(self: Self, patch: dict[Any, Any], app: APP) -> None:
+        """Process patches that are specific to certain apps.
+
+        Parameters
+        ----------
+        patch : dict[Any, Any]
+            The patch data
+        app : APP
+            The app instance
+        """
+        for compatible_package in patch["compatiblePackages"]:
+            package_name = compatible_package["name"]
+            versions = compatible_package["versions"]
+
+            if app.package_name == package_name:
+                patch_dict = self._create_patch_dict(patch, package_name, versions)
+
+                if not self._is_duplicate_patch(patch_dict["name"], app.app_name):
+                    self.patches_dict[app.app_name].append(patch_dict)
+
+    def _process_patches(self: Self, patches: list[dict[Any, Any]], app: APP) -> None:
+        """Process patches from a single bundle and add them to the patches dict.
+
+        Parameters
+        ----------
+        patches : list[dict[Any, Any]]
+            List of patches from a bundle
+        app : APP
+            The app instance
+        """
+        for patch in patches:
+            if not patch["compatiblePackages"]:
+                self._process_universal_patch(patch)
+            else:
+                self._process_app_specific_patch(patch, app)
 
     def __init__(self: Self, config: RevancedConfig, app: APP) -> None:
         self.patches_dict: dict[str, list[dict[str, str]]] = {"universal_patch": []}
@@ -170,6 +276,23 @@ class Patches(object):
             version = next(i["version"] for i in patches if i["version"] != "all")
         return patches, version
 
+    def _is_experimental_version(self: Self, app_version: str, recommended_version: str) -> bool:
+        """Check if the app version is experimental (different from recommended).
+
+        Parameters
+        ----------
+        app_version : str
+            The requested app version
+        recommended_version : str
+            The recommended version from patches
+
+        Returns
+        -------
+        bool
+            True if the version is experimental
+        """
+        return app_version == "latest" or app_version > recommended_version or app_version < recommended_version
+
     def get_app_configs(self: Self, app: "APP") -> list[dict[str, str]]:
         """The function `get_app_configs` returns configurations for a given app.
 
@@ -185,17 +308,14 @@ class Patches(object):
         the given app. Each dictionary in the list contains the keys "Patches", "Version", and
         "Experimental".
         """
-        experiment = False
         total_patches, recommended_version = self.get(app=app.app_name)
+        experiment = False
+
         if app.app_version:
             logger.debug(f"Picked {app} version {app.app_version:} from env.")
-            if (
-                app.app_version == "latest"
-                or app.app_version > recommended_version
-                or app.app_version < recommended_version
-            ):
-                experiment = True
+            experiment = self._is_experimental_version(app.app_version, recommended_version)
             recommended_version = app.app_version
+
         app.app_version = recommended_version
         app.experiment = experiment
         return total_patches
